@@ -305,7 +305,9 @@ latest *snapshot* and can signify when a new snapshot of the repository is
 available.  The *snapshot* role indicates the latest version of all the TUF
 metadata files (other than *timestamp*).  The *targets* role lists the
 available target files (in our case, it will be all files on PyPI under the
-/simple and /packages directories).  Each top-level role will serve its
+/simple and /packages directories).  These target files do not need to be
+URIs or relative files on the same repository as long as they can be accessed
+by anyone performing an update.  Each top-level role will serve its
 responsibilities without exception.  Figure 1 provides a table of the roles
 used in TUF.
 
@@ -333,12 +335,13 @@ details of signing repository files and the types of keys used for each role.
 
 Figure 2: An overview of the role metadata available on PyPI.
 
-The roles that change most frequently are *timestamp*, *snapshot* and delegated
-roles (*bins* and its delegated roles).  The *timestamp* and *snapshot*
+The roles that change most frequently are *timestamp*, *snapshot* and roles
+delegated to by *bins* (i.e., *bin-n*).  The *timestamp* and *snapshot*
 metadata MUST be updated whenever *root*, *targets* or delegated metadata are
 updated.  Observe, though, that *root* and *targets* metadata are much less
-likely to be updated as often as delegated metadata.  Therefore, *timestamp*
-and *snapshot* metadata will most likely be updated frequently (possibly every
+likely to be updated as often as delegated metadata.  Similarly, the *bins* role
+will only be updated when new bins are added.  Therefore, *timestamp*,
+*snapshot*, and *bin-n* metadata will most likely be updated frequently (possibly every
 minute) due to delegated metadata being updated frequently in order to support
 continuous delivery of projects.  Continuous delivery is a set of processes
 that PyPI uses produce snapshots that can safely coexist and be deleted
@@ -373,7 +376,7 @@ root metadata and downloads the rest of the roles, including updating
 "root.json" if it has changed.  An `outline of the update process`__ is
 available.
 
-__ https://github.com/theupdateframework/tuf/tree/develop/tuf/client#overview-of-the-update-process.
+__ https://github.com/theupdateframework/specification/blob/master/tuf-spec.md#5-detailed-workflows.
 
 
 Minimum Security Model
@@ -397,8 +400,8 @@ not have any of the keys required to sign for projects.  However, it does not
 protect projects from attackers who have compromised PyPI, since attackers can
 manipulate TUF metadata using the keys stored online.
 
-This PEP proposes that the *bins* role (and its delegated roles) sign for all
-PyPI projects with an online key.  The *targets* role, which only signs with an
+This PEP proposes that the *bin-n* roles sign for all
+PyPI projects with online keys.  The *targets* role, which only signs with an
 offline key, MUST delegate all PyPI projects to the *bins* role.  This means
 that when a package manager such as pip (i.e., using TUF) downloads a
 distribution from a project on PyPI, it will consult the *bins* role about the
@@ -410,10 +413,10 @@ PyPI.
 Metadata Expiry Times
 ---------------------
 
-The *root* and *targets* role metadata SHOULD expire in one year, because these
+The metadata for the *root*, *targets*, and *bins* roles SHOULD each expire in one year, because these
 two metadata files are expected to change very rarely.
 
-The *timestamp*, *snapshot*, and *bins* metadata SHOULD expire in one day
+The *timestamp*, *snapshot*, and *bin-n* metadata SHOULD each expire in one day
 because a CDN or mirror SHOULD synchronize itself with PyPI every day.
 Furthermore, this generous time frame also takes into account client clocks
 that are highly skewed or adrift.
@@ -436,12 +439,15 @@ install or upgrade a PyPI project via TUF.
 
 __ https://github.com/theupdateframework/tuf/blob/v0.11.1/docs/TUTORIAL.md#delegate-to-hashed-bins
 
-Based on our findings as of the time of writing, PyPI SHOULD split all targets
-in the *bins* role by delegating them to 1024 delegated roles, each of which
-would sign for PyPI targets whose hashes fall into that "bin" or delegated role
-(see Figure 2).  It was found that 1024 bins would result in the *bins*
-metadata, and each of its delegated roles, being about the same size (40-50KB)
-for about 220K PyPI targets (simple indices and distributions).
+Based on our findings as of the time of updating it for implementation
+(Oct 7 2019), PyPI SHOULD split all targets in the *bins* role by delegating
+them to 16,384 delegated roles, each of which would sign for PyPI targets whose
+hashes fall into that "bin" or delegated role (see Figure 2).  It was found__
+that this number of bins would result in a 12-17% metadata overhead for
+returning users, and a 148% overhead for new users who are installing
+pip for the first time.
+
+__ https://docs.google.com/spreadsheets/d/11_XkeHrf4GdhMYVqpYWsug6JNz5ZK6HvvmDZX0__K2I/edit?usp=sharing
 
 It is possible to make TUF metadata more compact by representing it in a binary
 format as opposed to the JSON text format.  Nevertheless, a sufficiently large
@@ -468,21 +474,8 @@ order to be able to run on as many systems as Python supports; and third, TUF
 recommends diversity of keys for certain applications.
 
 
-Number Of Keys Recommended
---------------------------
-
-The *timestamp*, *snapshot*, and *bins* roles require continuous delivery.
-Even though their respective keys MUST be online, this PEP requires that the
-keys be independent of each other.  Different keys for online roles allow for
-each of the keys to be placed on separate servers if need be, and prevents side
-channel attacks that compromise one key from automatically compromising the
-rest of the keys.  Therefore, each of the *timestamp*, *snapshot*, and *bins*
-roles MUST require (1, 1) keys.
-
-The *bins* role MAY delegate targets in an automated manner to a number of
-roles called "bins", as discussed in the previous section.  Each of the "bin"
-roles SHOULD share the same key as the *bins* role, due to space efficiency,
-and because there is no security advantage to requiring separate keys.
+Number and Type Of Keys Recommended
+-----------------------------------
 
 The *root* role key is critical for security and should very rarely be used.
 It is primarily used for key revocation, and it is the locus of trust for all
@@ -504,21 +497,111 @@ MUST be offline and independent of other keys.  For simplicity of key
 management, without sacrificing security, it is RECOMMENDED that the keys of
 the *targets* role be permanently discarded as soon as they have been created
 and used to sign for the role.  Therefore, the *targets* role SHOULD require
-(1, 1) keys.  Again, this is because the keys are going to be permanently
-discarded and more offline keys will not help resist key recovery attacks [21]_
-unless diversity of keys is maintained.
+(2, 2) keys.  Again, this is because the keys are going to be permanently
+discarded, and more offline keys will not help resist key recovery
+attacks [21]_ unless diversity of cryptographic algorithms is maintained.
+
+For similar reasons, the keys for the *bins* role SHOULD be set up similar to
+the keys for the *targets* role.
+
+In order to support continuous delivery, the keys for the *timestamp*,
+*snapshot*, and all *bin-n* roles MUST be online. There is little benefit in
+requiring all of these roles to use different online keys, since attackers
+would presumably be able to compromise all of them if they compromise PyPI.
+Therefore, it is reasonable to use one online key for them all.
 
 
-Online and Offline Keys Recommended for Each Role
--------------------------------------------------
+Managing online keys
+---------------------
 
-In order to support continuous delivery, the *timestamp*, *snapshot*, *bins*
-role keys MUST be online.
+The online key shared by the *timestamp*, *snapshot*, and all *bin-n* roles
+MAY be stored, encrypted or not, on the Python infrastructure. For example,
+the key MAY be kept on a self-hosted key management service (e.g. Hashicorp
+Vault__), or a third-party one (e.g. AWS KMS__, Google Cloud KMS__, or Azure
+Key Vault__).
 
-As explained in the previous section, the *root* and *targets* role keys MUST
-be offline for maximum security: these keys will be offline in the sense that
-their private keys MUST NOT be stored on PyPI, though some of them MAY be
-online in the private infrastructure of the project.
+__ https://www.vaultproject.io/
+__ https://aws.amazon.com/kms/
+__ https://cloud.google.com/kms/
+__ https://docs.microsoft.com/en-us/azure/key-vault/basic-concepts
+
+Some of these key management services allow keys to be stored on Hardware
+Security Modules (HSMs) (e.g., Hashicorp Vault__, AWS CloudHSM__, Google
+Cloud HSM__, Azure Key Vault__). This prevents attackers from exfiltrating
+the online private key (albeit not from using it, although their actions
+may now be cryptographically auditable). However, this requires modifying
+the reference TUF implementation to support HSMs (WIP__).
+
+__ https://www.vaultproject.io/docs/enterprise/hsm/index.html
+__ https://aws.amazon.com/cloudhsm/
+__ https://cloud.google.com/hsm/
+__ https://docs.microsoft.com/en-us/azure/key-vault/key-vault-hsm-protected-keys
+__ https://github.com/secure-systems-lab/securesystemslib/pull/170
+
+Regardless of where and how this online key is kept, its use SHOULD be
+carefully logged, monitored, and audited, ideally in a such a manner that
+attackers who compromise PyPI are unable to immediately turn off this logging,
+monitoring, and auditing.
+
+Managing offline keys
+----------------------
+
+As explained in the previous section, the *root*, *targets*, and *bins* role
+keys MUST be offline for maximum security: these keys will be offline in the
+sense that their private keys MUST NOT be stored on PyPI, though some of them
+MAY be online in the private infrastructure of the project.
+
+There SHOULD be an offline key ceremony to generate, backup, and store these
+keys in in such a manner that the private keys can be read only by the Python
+administrators when necessary (e.g., such as rotating the keys for the
+top-level TUF roles). Thus, keys SHOULD be generated—preferably in a physical
+location where side-channel attacks__ are not a concern—using:
+
+1. A trusted, airgapped__ computer with a true random number generator__, and
+   with no **data** persisted after the ceremony
+2. A trusted operating system
+3. A trusted set of third-party packages (e.g., cryptographic libraries, the
+   TUF reference implementation)
+
+__ https://en.wikipedia.org/wiki/Side-channel_attack
+__ https://en.wikipedia.org/wiki/Air_gap_(networking)
+__ https://en.wikipedia.org/wiki/Hardware_random_number_generator
+
+In order to avoid persisting sensitive data (e.g., private keys) other than
+on backup media after the ceremony, offline keys SHOULD be generated
+encrypted using strong passwords, either on (in decreasing order of trust):
+private HSMs (e.g., YubiHSM__), cloud-based HSMs (e.g., those listed above),
+in volatile memory (e.g., RAM), or in nonvolatile memory
+(e.g., SSD or microSD).  If keys must be generated on nonvolatile memory,
+then this memory MUST be irrecoverably destroyed after having securely
+backed up the keys.
+
+__ https://www.yubico.com/products/yubihsm/
+
+Passwords used to encrypt keys SHOULD be stored somewhere durable and
+trustworthy where only Python admins have access.
+
+In order to minimize OPSEC__ errors during the ceremony, scripts SHOULD be
+written to automate tedious parts such as:
+
+- Exporting to sneakernet__ all code and data (e.g., previous TUF metadata,
+  targets, and *root* keys) required to generate new keys and replace old ones
+- Tighten the firewall, update the entire operating system in order to
+  fix security vulnerabilities, and airgap the computer
+- Print and save cryptographic hashes of new TUF metadata
+- Export *all* new TUF metadata, targets, and keys to encrypted backup media
+- Export *only* new TUF metadata, targets, and online keys to encrypted backup
+  media
+
+__ https://en.wikipedia.org/wiki/Operations_security
+__ https://en.wikipedia.org/wiki/Sneakernet
+
+Note the one-time keys for the *targets* and *bins* roles MAY be safely
+generated, used, and deleted during the offline key ceremony. Furthermore,
+the *root* keys MAY not be generated during the offline key ceremony itself:
+instead, a threshold t of n Python administrators, as discussed above, may sign
+independently sign the *root* metadata **after** the offline key ceremony used
+to generate all other keys.
 
 
 How Should Metadata be Generated?
@@ -542,37 +625,48 @@ that disagrees with what is available on PyPI, which is indistinguishable from
 arbitrary metadata injected by an attacker.  The problem would also occur for
 mirrors attempting to sync with PyPI.
 
-
 Consistent Snapshots
 --------------------
 
-There are problems with consistency on PyPI with or without TUF.  TUF requires
-that its metadata be consistent with the repository files, but how would the
-metadata be kept consistent with projects that change all the time?  As a
-result, this proposal MUST address the problem of producing a consistent
-snapshot that captures the state of all known projects at a given time.  Each
-snapshot should safely coexist with any other snapshot, and be able to be
-deleted independently, without affecting any other snapshot.
+To keep TUF metadata on PyPI consistent with the highly volatile target files,
+consistent snapshots SHOULD be used. Each consistent snapshot captures the
+state of all known projects at a given time and MAY safely coexist with any
+other snapshot, or be deleted independently, without affecting any other
+snapshot.
 
-The solution presented in this PEP is that every metadata or data file managed
-by PyPI and written to disk MUST include in its filename the `cryptographic
-hash`__ of the file.  How would this help clients that use the TUF protocol to
-securely and consistently install or update a project from PyPI?
+To maintain consistent snapshots, all TUF metadata MUST, when written to disk,
+include a version number in their filename:
+
+  VERSION_NUMBER.ROLENAME.json,
+    where VERSION_NUMBER is an incrementing integer, and ROLENAME is one of the
+    top-level metadata roles -- *root*, *snapshot* or *targets* -- or one of
+    the delegated targets roles -- *bins* or *bin <i>*.
+
+The only exception is the *timestamp* metadata file, whose version is not known
+in advance, when a client performs an update.
+
+Instead the *timestamp* metadata serves as version root. That is, it lists the
+version of the *snapshot* metadata, which in turn lists the versions of *root*,
+*targets* and delegated targets metadata, all part of a given consistent
+snapshot.
+
+Eventually, *targets* or delegated targets metadata point to the actual target
+files, including their `cryptographic hashes`__. Thus, to mark a target file as
+part of a consistent snapshot it MUST, when written to disk, include its hash
+in its filename:
+
+  HASH.FILENAME
+    where HASH is the `hex digest`__ of the `SHA-256`__ hash of the file
+    contents and FILENAME is the original filename.
 
 __ https://en.wikipedia.org/wiki/Cryptographic_hash_function
+__ https://docs.python.org/3.7/library/hashlib.html#hashlib.hash.hexdigest
+__ https://en.wikipedia.org/wiki/SHA-2
 
-The first step in the TUF protocol requires the client to download the latest
-*timestamp* metadata.  However, the client would not know in advance the hash
-of the *timestamp* associated with the latest snapshot.  Therefore, PyPI MUST
-redirect all HTTP GET requests for *timestamp* to the *timestamp* referenced in
-the latest snapshot.  The *timestamp* role is the root of a tree of
-cryptographic hashes that points to every other metadata that is meant to exist
-together (i.e., clients request metadata in timestamp -> snapshot -> root ->
-targets order).  Clients are able to retrieve any file from this snapshot
-by deterministically including, in the request for the file, the hash of the
-file in the filename.  Assuming infinite disk space and no `hash collisions`__,
-a client may safely read from one snapshot while PyPI produces another
-snapshot.
+
+Assuming infinite disk space, strictly incrementing version numbers, and no
+`hash collisions`__, a client may safely read from one snapshot while PyPI
+produces another snapshot.
 
 __ https://en.wikipedia.org/wiki/Collision_(computer_science)
 
@@ -598,14 +692,6 @@ called the "project transaction".  How PyPI MAY validate the files in a project
 transaction is discussed in a later section.  For now, the focus is on how PyPI
 will respond to a project transaction.
 
-Every metadata and target file MUST include in its filename the `hex digest`__
-of its `SHA-256`__ hash.  For this PEP, it is RECOMMENDED that PyPI adopt a
-simple convention of the form: digest.filename, where filename is the original
-filename without a copy of the hash, and digest is the hex digest of the hash.
-
-__ http://docs.python.org/2/library/hashlib.html#hashlib.hash.hexdigest
-__ https://en.wikipedia.org/wiki/SHA-2
-
 When a project uploads a new transaction, the project transaction process MUST
 add all new targets and relevant delegated *bins* metadata.  (It is shown later
 in this section why the *bins* role will delegate targets to a number of
@@ -618,7 +704,11 @@ The project transaction and snapshot processes SHOULD work concurrently.
 Finally, project transaction processes SHOULD keep in memory the latest *bins*
 metadata so that they will be correctly updated in new consistent snapshots.
 
-All project transactions MAY be placed in a single queue and processed
+Signing updated snapshot, timestamp, and bin metadata needs to be done on each 
+update.  Fortunately, the actual operation of signing is fast enough that this
+may be done a thousand or more times per second.  However, locking must be
+used so that project transactions are handled sequentially.  To achieve this,
+all project transactions MAY be placed in a single queue and processed
 serially.  Alternatively, the queue MAY be processed concurrently in order of
 appearance, provided that the following rules are observed:
 
@@ -638,7 +728,7 @@ Snapshot Process
 
 The snapshot process is fairly simple and SHOULD be automated.  The snapshot
 process MUST keep in memory the latest working set of *root*, *targets*, and
-delegated roles.  Every minute or so, the snapshot process will sign for this
+delegated roles.  Upon an update, the snapshot process will sign for this
 latest working set.  (Recall that project transaction processes continuously
 inform the snapshot process about the latest delegated metadata in a
 concurrency-safe manner.  The snapshot process will actually sign for a copy of
@@ -666,16 +756,41 @@ snapshot.
 
 All clients, such as pip using the TUF protocol, MUST be modified to download
 every metadata and target file (except for *timestamp* metadata) by including,
-in the request for the file, the cryptographic hash of the file in the
-filename.  Following the filename convention recommended earlier, a request for
-the file at filename.ext will be transformed to the equivalent request for the
-file at digest.filename.
+in the request for the file, the version of the file (for metadata), or the
+cryptographic hash of the file (for target files) in the filename.
 
 Finally, PyPI SHOULD use a `transaction log`__ to record project transaction
 processes and queues so that it will be easier to recover from errors after a
 server failure.
 
 __ https://en.wikipedia.org/wiki/Transaction_log
+
+
+Cleaning up old metadata
+------------------------
+
+Prior versions of snapshot, targets, and timestamp metadata does not need to 
+be kept indefinitely.  (Root files must be indefinitely retained.)
+However, a client that performs an update MUST be able
+to retrieve a consistent set of versions of the files on the repository.
+For example, if a client downloads a snapshot file, it should retrieve the versions
+of targets metadata that existed when that snapshot file was created, even if
+the targets metadata has been updated concurrently with the client requests.
+Fortunately, the use of hash / version delegations handle this case automatically
+since clients request targets unambiguously.  Once no clients could reasonably
+be requesting outdated targets, snapshot or timestamp files, those files may be
+removed to save space.  Thus files that were obsoleted some reasonable time
+in the past (such as 1 hour) may be safely discarded.
+
+Revoking Trust in Projects and Versions
+=======================================
+
+From time to time either a project or a version of a package will need to be revoked.
+To revoke trust in a version of a package, the bin role can simply remove the
+delegation and re-sign the bin metadata.  Similarly, an entire project may be removed
+by removing the bin metadata references to the metadata and package versions.  
+All of these actions only require actions with the online bin key.
+
 
 
 Key Compromise Analysis
@@ -856,7 +971,7 @@ indicates an attack.
 
 As for attacks that serve different versions of metadata, or freeze a version
 of a package at a specific version, they can be handled by TUF with techniques
-like implicit key revocation and metadata mismatch detection [81].
+like implicit key revocation and metadata mismatch detection [2].
 
 
 Appendix A: Repository Attacks Prevented by TUF
@@ -932,7 +1047,7 @@ in this section:
    delegate trust of these wheels to an online role.
 
 2. An easy-to-use key management solution is needed for developers.
-   `miniLock`__ is one likely candidate for management and generation of keys.
+   `YubiKey`__ is one likely candidate for management and generation of keys.
    Although developer signatures can remain optional, this approach may be
    inadequate due to the great number of potentially unsigned dependencies each
    distribution may have.  If any one of these dependencies is unsigned, it
@@ -942,7 +1057,7 @@ in this section:
    distributions and manage keys is expected to render key signing an unused
    feature.
 
-    __ https://github.com/kaepora/miniLock
+    __ https://www.yubico.com/products/yubikey-hardware/
 
 3. A two-phase approach, where the minimum security model is implemented first
    followed by the maximum security model, can simplify matters and give PyPI
