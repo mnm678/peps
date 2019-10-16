@@ -790,8 +790,8 @@ Revoking Trust in Projects and Versions
 =======================================
 
 From time to time either a project or a version of a package will need to be revoked.
-To revoke trust in either a project or a version of a package, the associated bin-n role can 
-simply remove the corresponding targets and re-sign the bin-n metadata.  This action only 
+To revoke trust in either a project or a version of a package, the associated bin-n role can
+simply remove the corresponding targets and re-sign the bin-n metadata.  This action only
 requires actions with the online bin-n key.
 
 
@@ -817,22 +817,23 @@ attack, or metadata inconsistency attacks.
 +=================+===================+================+================================+
 | timestamp       | NO                | YES            | NO                             |
 |                 | snapshot and      | limited by     | snapshot needs to cooperate    |
-|                 | targets or any    | earliest root, |                                |
-|                 | of the bins need  | targets, or    |                                |
-|                 | to cooperate      | bin expiry     |                                |
-|                 |                   | time           |                                |
+|                 | targets, bins, or | earliest root, |                                |
+|                 | any of the bin-n  | targets, bins, |                                |
+|                 | roles need to     | or bin-n       |                                |
+|                 | cooperate         | expiry time    |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | snapshot        | NO                | NO             | NO                             |
 |                 | timestamp and     | timestamp      | timestamp needs to cooperate   |
-|                 | targets or any of | needs to       |                                |
-|                 | the bins need to  | cooperate      |                                |
+|                 | targets, bins, or | needs to       |                                |
+|                 | any of the bin-n  | cooperate      |                                |
+|                 | roles need to     |                |                                |
 |                 | cooperate         |                |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | timestamp       | NO                | YES            | YES                            |
-| **AND**         | targets or any    | limited by     | limited by earliest root,      |
-| snapshot        | of the bins need  | earliest root, | targets, or bin metadata       |
-|                 | to cooperate      | targets, or    | expiry time                    |
-|                 |                   | bin metadata   |                                |
+| **AND**         | targets, bins, or | limited by     | limited by earliest root,      |
+| snapshot        | any of the bin-n  | earliest root, | targets, bins, or bin-n        |
+|                 | roles need to     | targets, bins, | metadata expiry time           |
+|                 | cooperate         | or bin-n       |                                |
 |                 |                   | expiry time    |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | targets         | NO                | NOT APPLICABLE | NOT APPLICABLE                 |
@@ -842,9 +843,9 @@ attack, or metadata inconsistency attacks.
 +-----------------+-------------------+----------------+--------------------------------+
 | timestamp       | YES               | YES            | YES                            |
 | **AND**         |                   | limited by     | limited by earliest root,      |
-| snapshot        |                   | earliest root, | targets, or bin metadata       |
-| **AND**         |                   | targets, or    | expiry time                    |
-| bin             |                   | bin metadata   |                                |
+| snapshot        |                   | earliest root, | targets, bins, or bin-n        |
+| **AND**         |                   | targets, bins, | metadata expiry time           |
+| bin-n           |                   | or bin-n       |                                |
 |                 |                   | expiry time    |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | root            | YES               | YES            | YES                            |
