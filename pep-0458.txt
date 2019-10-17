@@ -836,17 +836,18 @@ attack, or metadata inconsistency attacks.
 |                 | cooperate         | or bin-n       |                                |
 |                 |                   | expiry time    |                                |
 +-----------------+-------------------+----------------+--------------------------------+
-| targets         | NO                | NOT APPLICABLE | NOT APPLICABLE                 |
+| targets         | NO                | NO             | NO                             |
 | **OR**          | timestamp and     | need timestamp | need timestamp and snapshot    |
-| bin             | snapshot need to  | and snapshot   |                                |
-|                 | cooperate         |                |                                |
+| bins            | snapshot need to  | and snapshot   |                                |
+| **OR**          | cooperate         |                |                                |
+| bin-n           |                   |                |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | timestamp       | YES               | YES            | YES                            |
-| **AND**         |                   | limited by     | limited by earliest root,      |
-| snapshot        |                   | earliest root, | targets, bins, or bin-n        |
-| **AND**         |                   | targets, bins, | metadata expiry time           |
-| bin-n           |                   | or bin-n       |                                |
-|                 |                   | expiry time    |                                |
+| **AND**         | limited by        | limited by     | limited by earliest root,      |
+| snapshot        | earliest root,    | earliest root, | targets, or bins metadata      |
+| **AND**         | targets, or       | targets, or    | expiry time                    |
+| bin-n           | bins expiry       | bins expiry    |                                |
+|                 | time              | time           |                                |
 +-----------------+-------------------+----------------+--------------------------------+
 | root            | YES               | YES            | YES                            |
 +-----------------+-------------------+----------------+--------------------------------+
