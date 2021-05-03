@@ -324,25 +324,35 @@ tweaked to taste.
 Key Management: Fulcio
 ------------------------
 
-An easy-to-use key management solution is needed. In addition to delegations to an Ed25519 public key, developers MAY request a delegation to their email address, to be verified by Fulcio__. Fulcio generates short-lived signing certificates backed by OIDC authentication of a developer’s email address. Because the certificates are short-lived, the developer will not be responsible for protecting this key in the long term.
+An easy-to-use key management solution is needed. In addition to delegations to
+an Ed25519 public key, developers MAY request a delegation to their email
+address, to be verified by Fulcio__. Fulcio generates short-lived signing
+certificates backed by OIDC authentication of a developer’s email address.
+Because the certificates are short-lived, the developer will not be responsible
+for protecting this key in the long term.
 
-In order to facilitate use of Fulcio, delegations MAY list an email address and location of a Fulcio server instead of a public key. So,
+In order to facilitate use of Fulcio, delegations MAY list an email address and
+location of a Fulcio server instead of a public key. So,
 
-```
-"keys" : {
+
+   "keys" : {
       KEYID : KEY,
       ...
-  }
-```
+   }
+
 Would become
-```
-"keys" : {
+
+   "keys" : {
       EMAIL : SERVER,
       ...
-  }
-```
+   }
 
-Using this mechanism, the developer requests a certificate from Fulcio, verifies their identity using OIDC, uses the certificate to sign their targets metadata, and uploads the signed metadata to Warehouse. This signature MUST be verified by Warehouse and MAY be verified by the end user by verifying the certificate through Fulcio.
+
+Using this mechanism, the developer requests a certificate from Fulcio, verifies
+their identity using OIDC, uses the certificate to sign their targets metadata,
+and uploads the signed metadata to Warehouse. This signature MUST be verified by
+Warehouse and MAY be verified by the end user by verifying the certificate
+through Fulcio.
 
 __ https://github.com/sigstore/fulcio
 
