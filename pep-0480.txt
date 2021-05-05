@@ -327,7 +327,9 @@ Key Management: Fulcio
 An easy-to-use key management solution is needed. In addition to delegations to
 an Ed25519 public key, developers MAY request a delegation to their email
 address, to be verified by Fulcio__. Fulcio generates short-lived signing
-certificates backed by OIDC authentication of a developer’s email address.
+certificates backed by OpenID Connect (OIDC)__ authentication of a developer’s
+email address. OIDC uses OAuth APIs to verify that the developer is the owner
+of the given email address, then generate an access token.
 Because the certificates are short-lived, the developer will not be responsible
 for protecting this key in the long term.
 
@@ -355,6 +357,7 @@ Warehouse and MAY be verified by the end user by verifying the certificate
 through Fulcio.
 
 __ https://github.com/sigstore/fulcio
+__ https://openid.net/connect/
 
 
 Third-party Upload Tools: Twine
